@@ -1,0 +1,93 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  # release:
+  #     types: [created]      
+
+jobs:
+  publish-release:
+    runs-on: ubuntu-24.04
+    env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+
+      # - name: Install uv (for act)
+      #   run: |
+      #     curl -LsSf https://astral.sh/uv/install.sh | sh
+      #     source $HOME/.local/bin/env
+      #     uv --version
+
+      #     sudo apt update
+      #     sudo apt install -y gh
+
+      - name: Build Wheel
+        run: |
+          uv build     
+
+      - name: Get version
+        run: |
+          echo "RELEASE_VERSION=${GITHUB_REF/refs\/tags\//}" >> $GITHUB_ENV
+          prev_version=$(gh release list | grep Latest | awk '{print $1}')
+          echo "PREV_VERSION=$prev_version" >> $GITHUB_ENV
+
+      - name: Write Changelog
+        run: |
+          touch .CurrentChangelog.md
+
+          if [ -n "${{ env.PREV_VERSION }}" ]; then
+            prev_to_latest="${{ env.PREV_VERSION }}...${{ env.RELEASE_VERSION }}"
+            printf "\n\n**Full Changelog:** [\`${prev_to_latest}\`](https://github.com/${{ github.repository }}/compare/${prev_to_latest})" >> .CurrentChangelog.md
+          fi
+
+      - name: Generate Checksums
+        working-directory: ./dist
+        run: |
+          while IFS= read -r filename; do
+            sha256sum "$filename" >> "checksums.txt"
+          done < <(ls -1)
+
+      - name: Create Release
+        run: |
+          gh release create ${{ env.RELEASE_VERSION }} --draft --notes-file .CurrentChangelog.md --prerelease --title "${{ env.RELEASE_VERSION }}" --verify-tag
+
+      - name: Upload Wheel as Release Asset
+        working-directory: ./dist
+        run: |
+          gh release upload ${{ env.RELEASE_VERSION }} ./*.* --clobber
+
+      - name: Publish Release
+        run: |
+          gh release edit ${{ env.RELEASE_VERSION }} --draft=false --prerelease=false --latest
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: artifact
+          path: ./dist/*.*
+
+      # - name: Publish package distributions to PyPI
+      #   uses: pypa/gh-action-pypi-publish@release/v1
+      #   if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags')
+      #   with:
+      #     password: ${{ secrets.PYPI_API_TOKEN }}
+      #     # password: ${{ secrets.TEST_PYPI_API_TOKEN }}
+      #     # repository-url: https://test.pypi.org/legacy/
+
+      - name: Publish to PyPI
+        env:
+          UV_PUBLISH_URL: ${{ vars.UV_PUBLISH_URL }}
+          UV_PUBLISH_TOKEN: ${{ secrets.UV_PUBLISH_TOKEN }}
+        run: |
+          if [ -n "$UV_PUBLISH_TOKEN" ]; then
+            uv publish
+          else
+            echo "Have no UV_PUBLISH_TOKEN, skipping publish"
+          fi

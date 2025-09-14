@@ -1,0 +1,196 @@
+name: Docker-Release
+
+on:
+  push:
+    tags:
+      - "*"
+  # release:
+  #     types: [created]
+
+env:
+  branch: latest
+  image_org: idevsig
+  acr_registry: registry.cn-guangzhou.aliyuncs.com
+  hcr_registry: swr.ap-southeast-3.myhuaweicloud.com
+  tcr_registry: sgccr.ccs.tencentyun.com
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    outputs:
+      tag: ${{ steps.set_tag.outputs.tag }}
+      package_name: ${{ steps.get_package_name.outputs.package_name }}
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+
+      - name: Set package name
+        id: get_package_name
+        run: |
+          PACKAGE_NAME="$(basename ${{ github.repository }})"
+          echo "package_name=$PACKAGE_NAME" >> $GITHUB_ENV
+          echo "package_name=$PACKAGE_NAME" >> $GITHUB_OUTPUT
+
+      - name: Set tag without 'v' prefix
+        id: set_tag
+        run: |
+            ref_tag="${{ github.ref_name }}"
+            ref_tag="${ref_tag#v}"
+            echo "Detected tag: $ref_tag"
+            echo "tag=$ref_tag" >> $GITHUB_ENV
+            echo "tag=$ref_tag" >> $GITHUB_OUTPUT
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Docker meta
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.package_name }}
+          labels: |
+            org.opencontainers.image.title=${{ env.package_name }}
+            org.opencontainers.image.vendor=Jetsung Chan
+          tags:
+            latest
+
+      - name: Build with Bake
+        uses: docker/bake-action@v6
+        with:
+          files: |
+            ./docker-bake.hcl
+            cwd://${{ steps.meta.outputs.bake-file }}
+          targets: release
+          push: false
+          set: |
+            *.output=type=oci,dest=./image.tar
+
+      - name: Upload image as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: docker-image
+          path: ./image.tar
+          retention-days: 1
+
+  sync-to-docker:
+    needs: build
+    runs-on: ubuntu-24.04
+    steps:
+    - name: Install Dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y skopeo
+        skopeo --version
+    - name: Login to DockerHub
+      uses: docker/login-action@v3
+      with:
+        username: ${{ secrets.DOCKERHUB_USERNAME }}
+        password: ${{ secrets.DOCKERHUB_TOKEN }}
+    - name: Download image artifact
+      uses: actions/download-artifact@v5
+      with:
+        name: docker-image
+        path: .
+    - name: Sync to Docker Hub
+      env:
+        SRC_IMAGE: oci-archive:./image.tar
+        DEST_REPO: ${{ env.image_org }}/${{ needs.build.outputs.package_name }}
+        DEST_TAG: ${{ needs.build.outputs.tag }}
+      run: |
+          skopeo copy --all $SRC_IMAGE docker://$DEST_REPO:$DEST_TAG
+          skopeo copy --all $SRC_IMAGE docker://$DEST_REPO:latest
+
+  sync-to-ghcr:
+    needs: build
+    runs-on: ubuntu-24.04
+    steps:
+    - name: Install Dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y skopeo
+        skopeo --version
+    - name: Login to GitHub Container Registry (ghcr.io)
+      uses: docker/login-action@v3
+      with:
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+    - name: Download image artifact
+      uses: actions/download-artifact@v5
+      with:
+        name: docker-image
+        path: .
+    - name: Sync to GitHub Container Registry (ghcr.io)
+      env:
+        SRC_IMAGE: oci-archive:./image.tar
+        DEST_REPO: ghcr.io/${{ github.repository_owner }}/${{ needs.build.outputs.package_name }}
+        DEST_TAG: ${{ needs.build.outputs.tag }}
+      run: |
+          skopeo copy --all $SRC_IMAGE docker://$DEST_REPO:$DEST_TAG
+          skopeo copy --all $SRC_IMAGE docker://$DEST_REPO:latest
+    - uses: actions/delete-package-versions@v5
+      continue-on-error: true
+      with:
+        package-name: ${{ needs.build.outputs.package_name }}
+        package-type: 'container'
+        min-versions-to-keep: 2
+        delete-only-untagged-versions: 'true'
+
+  sync-to-aliyun:
+    needs: build
+    runs-on: ubuntu-24.04
+    steps:
+    - name: Install Dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y skopeo
+    - name: Login to Aliyun
+      uses: docker/login-action@v3
+      with:
+        registry: ${{ env.acr_registry }}
+        username: ${{ secrets.ALIYUN_USERNAME }}
+        password: ${{ secrets.ALIYUN_TOKEN }}
+    - name: Download image artifact
+      uses: actions/download-artifact@v5
+      with:
+        name: docker-image
+        path: .
+    - name: Sync to Aliyun
+      env:
+        SRC_IMAGE: oci-archive:./image.tar
+        DEST_REPO: ${{ env.acr_registry }}/${{ env.image_org }}/${{ needs.build.outputs.package_name }}
+        DEST_TAG: ${{ needs.build.outputs.tag }}
+      run: |
+          skopeo copy --all $SRC_IMAGE docker://$DEST_REPO:$DEST_TAG
+          skopeo copy --all $SRC_IMAGE docker://$DEST_REPO:latest
+
+  sync-to-tencent:
+    needs: build
+    runs-on: ubuntu-24.04
+    steps:
+    - name: Install Dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y skopeo
+    - name: Login to Tencent
+      uses: docker/login-action@v3
+      with:
+        registry: ${{ env.tcr_registry }}
+        username: ${{ secrets.TENCENT_USERNAME }}
+        password: ${{ secrets.TENCENT_TOKEN }}
+    - name: Download image artifact
+      uses: actions/download-artifact@v5
+      with:
+        name: docker-image
+        path: .
+    - name: Sync to  Tencent
+      env:
+        SRC_IMAGE: oci-archive:./image.tar
+        DEST_REPO: ${{ env.tcr_registry }}/${{ env.image_org }}/${{ needs.build.outputs.package_name }}
+        DEST_TAG: ${{ needs.build.outputs.tag }}
+      run: |
+          skopeo copy --all $SRC_IMAGE docker://$DEST_REPO:$DEST_TAG
+          skopeo copy --all $SRC_IMAGE docker://$DEST_REPO:latest

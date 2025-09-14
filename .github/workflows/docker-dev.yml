@@ -1,0 +1,108 @@
+name: Docker-Dev
+
+on:
+  push:
+    branches:
+      - dev*
+    paths:
+      - .github/workflows/docker-dev.yml
+      - docker/Dockerfile
+      - src/**
+
+env:
+  GHCR_SLUG: ghcr.io/${{ github.repository }}
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-24.04
+            tag: dev-amd64
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+            tag: dev-arm64
+    runs-on: ${{ matrix.runner }}
+    outputs:
+      package_name: ${{ steps.get_package_name.outputs.package_name }}
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+
+      - name: Set package name
+        id: get_package_name
+        run: |
+          PACKAGE_NAME="$(basename ${{ github.repository }})"
+          echo "package_name=$PACKAGE_NAME" >> $GITHUB_ENV
+          echo "package_name=$PACKAGE_NAME" >> $GITHUB_OUTPUT
+
+      - name: Login to GitHub Container Registry (ghcr.io)
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # - name: Docker meta
+      #   id: meta
+      #   uses: docker/metadata-action@v5
+      #   with:
+      #     images: ${{ env.GHCR_SLUG }}
+      #     labels: |
+      #       org.opencontainers.image.title=${{ env.package_name }}
+      #       org.opencontainers.image.vendor=Jetsung Chan
+      #       org.opencontainers.image.email=i@jetsung.com
+      #       org.opencontainers.image.url=https://i.jetsung.com
+      #     tags: ${{ matrix.tag }}
+
+      # - name: Set up Docker Buildx
+      #   uses: docker/setup-buildx-action@v3
+
+      # - name: Build (without push)
+      #   uses: docker/bake-action@v6
+      #   with:
+      #     files: |
+      #       ./docker-bake.hcl
+      #       cwd://${{ steps.meta.outputs.bake-file }}
+      #     targets: ${{ matrix.tag }}
+      #     push: ${{ github.event_name != 'pull_request' }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./docker/Dockerfile
+          platforms: linux/${{ matrix.arch }}
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ env.GHCR_SLUG }}:${{ matrix.tag }}
+
+  manifest:
+    needs: build
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create and push multi-arch manifest
+        run: |
+          docker manifest create ${{ env.GHCR_SLUG }}:dev \
+            --amend ${{ env.GHCR_SLUG }}:dev-amd64 \
+            --amend ${{ env.GHCR_SLUG }}:dev-arm64
+          docker manifest push ${{ env.GHCR_SLUG }}:dev
+        shell: bash
+
+      - uses: actions/delete-package-versions@v5
+        continue-on-error: true
+        with:
+          package-name: ${{ needs.build.outputs.package_name }}
+          package-type: 'container'
+          min-versions-to-keep: 2
+          delete-only-untagged-versions: 'true'
