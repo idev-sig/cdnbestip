@@ -97,7 +97,7 @@ class IPSourceManager:
             ):
                 url = self._apply_cdn_url(url)
 
-            self._download_from_source(source_info, url, output_file, force_refresh)
+            self._download_from_source(source_info, url, output_file, force_refresh, source)
         else:
             # Treat as custom URL
             if not source.startswith(("http://", "https://")):
@@ -115,7 +115,7 @@ class IPSourceManager:
 
             # Assume text format for custom URLs
             source_info = {"type": "text", "name": "Custom"}
-            self._download_from_source(source_info, url, output_file, force_refresh)
+            self._download_from_source(source_info, url, output_file, force_refresh, source)
 
     def _apply_cdn_url(self, url: str) -> str:
         """Apply CDN URL prefix if configured."""
@@ -138,12 +138,12 @@ class IPSourceManager:
                 return f"{cdn_url}/{url}"
 
     def _download_from_source(
-        self, source_info: dict[str, Any], url: str, output_file: str, force_refresh: bool = False
+        self, source_info: dict[str, Any], url: str, output_file: str, force_refresh: bool = False, source: str = None
     ) -> None:
         """Download and process IP list from a source."""
         try:
             # Check cache first
-            cache_file = self._get_cache_file(url)
+            cache_file = self._get_cache_file(source or url)
             if not force_refresh and cache_file.exists() and self._is_cache_valid(cache_file):
                 self._copy_from_cache(cache_file, output_file)
                 return
@@ -235,13 +235,20 @@ class IPSourceManager:
         except OSError as e:
             raise IPSourceError(f"Failed to save IP list to {output_file}: {e}") from e
 
-    def _get_cache_file(self, url: str) -> Path:
-        """Get cache file path for a URL."""
-        # Create a safe filename from URL
+    def _get_cache_file(self, source: str) -> Path:
+        """Get cache file path for a source."""
         import hashlib
 
-        url_hash = hashlib.md5(url.encode()).hexdigest()
-        return self.cache_dir / f"ip_list_{url_hash}.txt"
+        # Generate cache filename based on source type
+        if source in self.IP_SOURCES:
+            # Use predefined source name for cache
+            cache_name = f"ip_list_{source}.txt"
+        else:
+            # Use MD5 hash of custom URL for cache
+            url_hash = hashlib.md5(source.encode()).hexdigest()
+            cache_name = f"ip_list_{url_hash}.txt"
+
+        return self.cache_dir / cache_name
 
     def _is_cache_valid(self, cache_file: Path, max_age_hours: int = 24) -> bool:
         """Check if cache file is still valid."""

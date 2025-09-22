@@ -21,7 +21,7 @@ cdnbestip -t YOUR_API_TOKEN [其他选项]
 export CLOUDFLARE_API_TOKEN="YOUR_API_TOKEN"
 ```
 
-**选项 2: API 密钥 + 电子邮件/账号ID**
+**选项 2: API 密钥 + 电子邮件**
 ```bash
 # 使用邮箱
 cdnbestip -a your_email@example.com -k YOUR_API_KEY [其他选项]
@@ -42,7 +42,9 @@ export CLOUDFLARE_API_KEY="YOUR_API_KEY"
 
 | 选项 | 描述 | 默认值 | 示例 |
 |--------|-------------|---------|---------|
-| `-s, --speed` | 速度阈值 (MB/s) | 2.0 | `-s 5.0` |
+| `-s, --speed` | 速度阈值 (MB/s) | 0.0 | `-s 5.0` |
+
+**注意：** 当 `-s` 为 0 时，不进行速度过滤，仅使用延迟过滤。当 `-s` 大于 0 时，同时使用速度和延迟过滤。
 | `-P, --port` | 测试端口 | 443 | `-P 80` |
 | `-u, --url` | 测试URL | 自动 | `-u https://speed.cloudflare.com/__down?bytes=25000000` |
 | `-q, --quantity` | 最大DNS记录数 | 0 (无限制) | `-q 5` |
@@ -53,7 +55,7 @@ export CLOUDFLARE_API_KEY="YOUR_API_KEY"
 |--------|--------|-------------|-------------|------------|
 | 无 | CloudflareSpeedTest | 使用工具默认设置 | 工具默认 | 否 |
 | `-i cf` | CloudFlare | CloudFlare IPv4地址段 | `https://cf.xiu2.xyz/url` | 否 |
-| `-i gc` | GCore | GCore CDN IP地址 | `https://hk2-speedtest.tools.gcore.com/speedtest-backend/garbage.php?ckSize=1000` | 否 |
+| `-i gc` | GCore | GCore CDN IP地址 | `https://hk2-speedtest.tools.gcore.com/speedtest-backend/garbage.php?ckSize=100` | 否 |
 | `-i ct` | CloudFront | AWS CloudFront IP地址段 | 无 | **是** |
 | `-i aws` | AWS | Amazon Web Services IP地址段 | 无 | **是** |
 | `-i URL` | 自定义 | 自定义IP列表URL | 无 | **是** |
@@ -78,9 +80,9 @@ export CLOUDFLARE_API_KEY="YOUR_API_KEY"
 
 | 选项 | 描述 | 示例 |
 |--------|-------------|----------|
-| `-g, --debug` | 启用调试模式 | `-g` |
+| `-D, --debug` | 启用调试模式 | `-D` |
 | `-v, --verbose` | 启用详细输出 | `-v` |
-| `-l, --log-level` | 设置日志级别 | `-l DEBUG` |
+| `-L, --log-level` | 设置日志级别 | `-L DEBUG` |
 | `-C, --no-console-log` | 禁用控制台日志 | `-C` |
 | `-F, --no-file-log` | 禁用文件日志 | `-F` |
 | `-V, --version` | 显示版本信息 | `-V` |

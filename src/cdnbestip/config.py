@@ -51,7 +51,7 @@ class Config:
     zone_type: str = "A"
 
     # Speed test settings
-    speed_threshold: float = 2.0
+    speed_threshold: float = 0.0
     speed_port: int | None = None
     speed_url: str | None = None
     timeout: int = 600  # Speed test timeout in seconds (default: 10 minutes)
@@ -299,8 +299,8 @@ def load_config(args) -> Config:
         cli_overrides["quantity"] = args.quantity
 
     # IP data source
-    if hasattr(args, "ipurl") and args.ipurl:
-        cli_overrides["ip_data_url"] = args.ipurl
+    if hasattr(args, "ip_url") and args.ip_url:
+        cli_overrides["ip_data_url"] = args.ip_url
 
     # Operational flags
     if hasattr(args, "refresh") and args.refresh:
@@ -378,7 +378,7 @@ def load_config_from_args(args) -> Config:
     config.update_dns = args_dict.get("dns", False)
     config.only_one = args_dict.get("only", False)
     config.cdn_url = args_dict.get("cdn", "https://fastfile.asfd.cn/")
-    config.ip_data_url = args_dict.get("ipurl")
+    config.ip_data_url = args_dict.get("ip_url")
     config.extend_string = args_dict.get("extend")
     config.proxy_url = args_dict.get("proxy")
     return config

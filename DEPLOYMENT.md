@@ -527,7 +527,7 @@ cdnbestip -i gc -d example.com -p gc -s 2  # GCore
 curl -I https://cf.xiu2.xyz/url
 
 # Test GCore endpoint
-curl -I https://hk2-speedtest.tools.gcore.com/speedtest-backend/garbage.php?ckSize=1000
+curl -I https://hk2-speedtest.tools.gcore.com/speedtest-backend/garbage.php?ckSize=100
 
 # Test custom endpoint
 curl -I https://your-custom-test-url.com/test

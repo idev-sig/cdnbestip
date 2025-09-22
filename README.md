@@ -19,13 +19,17 @@
 
 ### 安装
 
+**Python 版本要求：** Python 3.13+
+
+**PyPI 包地址：** [https://pypi.org/project/cdnbestip/](https://pypi.org/project/cdnbestip/)
+
 ```bash
 # 使用 pip 安装
 pip install cdnbestip
+uv tool install cdnbestip
 
 # 使用 pip + git 安装
 pip install git+https://github.com/idev-sig/cdnbestip.git
-
 # 或使用 uv 安装
 uv tool install git+https://github.com/idev-sig/cdnbestip.git
 
@@ -82,17 +86,7 @@ docker pull ghcr.io/idev-sig/cdnbestip:latest
 - Python 3.13 以上
 - [CloudflareSpeedTest](https://github.com/XIU2/CloudflareSpeedTest) v2.3.4 以上
 
-1. 安装 
-```bash
-# 使用 pip 安装
-pip install git+https://github.com/idev-sig/cdnbestip.git
-
-# 或使用 uv 安装
-uv tool install git+https://github.com/idev-sig/cdnbestip.git
-
-# 指定版本或分支
-uv tool install git+https://github.com/idev-sig/cdnbestip.git@v0.1.0
-```
+1. 安装（见[**上一节**](#安装)）
 
 2. 使用
 ```bash
@@ -103,7 +97,7 @@ cdnbestip -a user@example.com -k api_key -d example.com -p cf -s 5 -n -o
 cdnbestip -a user@example.com -k api_key -d example.com -p gc -s 5 -n -o -i gc
 
 # 使用 GCore IP 源 + 自定义测试 URL
-cdnbestip -a user@example.com -k api_key -d example.com -p gc -s 5 -n -o -i gc -u https://hk2-speedtest.tools.gcore.com/speedtest-backend/garbage.php?ckSize=1000
+cdnbestip -a user@example.com -k api_key -d example.com -p gc -s 5 -n -o -i gc -u https://hk2-speedtest.tools.gcore.com/speedtest-backend/garbage.php?ckSize=100
 ```
 
 ### Docker 使用方式
@@ -118,7 +112,7 @@ docker run --rm idevsig/cdnbestip:latest cdnbestip -a user@example.com -k api_ke
 docker run --rm idevsig/cdnbestip:latest cdnbestip -a user@example.com -k api_key -d example.com -p gc -s 5 -n -o -i gc
 
 # 使用 GCore IP 源 + 自定义测试 URL
-docker run --rm idevsig/cdnbestip:latest cdnbestip -a user@example.com -k api_key -d example.com -p gc -s 5 -n -o -i gc -u https://hk2-speedtest.tools.gcore.com/speedtest-backend/garbage.php?ckSize=1000
+docker run --rm idevsig/cdnbestip:latest cdnbestip -a user@example.com -k api_key -d example.com -p gc -s 5 -n -o -i gc -u https://hk2-speedtest.tools.gcore.com/speedtest-backend/garbage.php?ckSize=100
 ```
 
 #### 使用 Docker Compose
@@ -190,7 +184,7 @@ DNS Settings:
 
 Speed Test Settings:
   -s, --speed THRESHOLD
-                        Download speed threshold in MB/s (default: 2.0)
+                        Download speed threshold in MB/s (default: 0.0, 0 means no speed filtering)
   -P, --port PORT       Speed test port (0-65535)
   -u, --url URL         Speed test URL
   -T, --timeout SECONDS
@@ -198,7 +192,7 @@ Speed Test Settings:
   -q, --quantity COUNT  Number of DNS records to create (default: 0 = unlimited)
 
 IP Data Source:
-  -i, --ipurl SOURCE    IP data source: cf, gc, ct, aws, or custom URL
+  -i, --ip-url SOURCE    IP data source: cf, gc, ct, aws, or custom URL
 
 Operations:
   -r, --refresh         Force refresh result.csv file
@@ -211,9 +205,9 @@ Advanced Options:
   -x, --proxy URL       Proxy URL for Cloudflare API and IP list downloads
 
 Logging and Debugging:
-  -g, --debug           Enable debug mode with detailed logging
+  -D, --debug           Enable debug mode with detailed logging
   -v, --verbose         Enable verbose output
-  -l, --log-level {DEBUG,INFO,WARNING,ERROR,CRITICAL}
+  -L, --log-level {DEBUG,INFO,WARNING,ERROR,CRITICAL}
                         Set logging level (default: INFO)
   -C, --no-console-log  Disable console logging
   -F, --no-file-log     Disable file logging
@@ -249,14 +243,14 @@ Zone Types:
 > `-y` / `--type`:             DNS 记录类型（默认：A）   
 
 **速度测试设置：**
-> `-s` / `--speed`:            下载速度阈值，单位 MB/s（默认：2.0）     
+> `-s` / `--speed`:            下载速度阈值，单位 MB/s（默认：0.0，0表示不进行速度过滤，仅使用延迟过滤）     
 > `-P` / `--port`:             速度测试端口（0-65535）   
 > `-u` / `--url`:              速度测试 URL   
 > `-T` / `--timeout`:          速度测试超时时间，单位秒（默认：600）   
 > `-q` / `--quantity`:         创建的 DNS 记录数量（默认：0 = 无限制）   
 
 **IP 数据源：**
-> `-i` / `--ipurl`:            IP 数据源：cf, gc, ct, aws 或自定义 URL   
+> `-i` / `--ip-url`:            IP 数据源：cf, gc, ct, aws 或自定义 URL   
 
 **操作选项：**
 > `-r` / `--refresh`:          强制刷新 result.csv 文件    
@@ -269,9 +263,9 @@ Zone Types:
 > `-x` / `--proxy`:            代理服务器 URL，用于 Cloudflare API 和 IP 列表下载   
 
 **日志和调试：**
-> `-g` / `--debug`:            启用调试模式和详细日志   
+> `-D` / `--debug`:            启用调试模式和详细日志   
 > `-v` / `--verbose`:          启用详细输出   
-> `-l` / `--log-level`:        设置日志级别   
+> `-L` / `--log-level`:        设置日志级别   
 > `-C` / `--no-console-log`:   禁用控制台日志   
 > `-F` / `--no-file-log`:      禁用文件日志   
 
@@ -319,7 +313,7 @@ cdnbestip -d example.com -p cf -s 2 -n
 | IP 源 | 提供商 | 自动测试端点 | 需要 `-u` 参数？ |
 |-------|--------|-------------|-----------------|
 | `cf` | CloudFlare | `https://cf.xiu2.xyz/url` | 否 |
-| `gc` | GCore | `https://hk2-speedtest.tools.gcore.com/speedtest-backend/garbage.php?ckSize=1000` | 否 |
+| `gc` | GCore | `https://hk2-speedtest.tools.gcore.com/speedtest-backend/garbage.php?ckSize=100` | 否 |
 | `ct` | CloudFront | 无 | **是** |
 | `aws` | Amazon AWS | 无 | **是** |
 | 自定义 URL | 自定义 | 无 | **是** |

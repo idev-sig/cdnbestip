@@ -46,7 +46,7 @@ Examples:
   %(prog)s -a user@example.com -k api_key -d example.com -p cf -s 2 -n -o
 
   export CLOUDFLARE_API_KEY="api_key"
-  export CLOUDFLARE_email="user@example.com"
+  export CLOUDFLARE_EMAIL="user@example.com"
   %(prog)s -d example.com -p cf -s 2 -n -o
 
   # Using extend parameter to pass additional options to CloudflareSpeedTest
@@ -101,9 +101,9 @@ Zone Types:
         "-s",
         "--speed",
         type=float,
-        default=2.0,
+        default=0.0,
         metavar="THRESHOLD",
-        help="Download speed threshold in MB/s (default: 2.0)",
+        help="Download speed threshold in MB/s (default: 0.0, 0 means no speed filtering)",
     )
     speed_group.add_argument(
         "-P", "--port", type=int, metavar="PORT", help="Speed test port (0-65535)"
@@ -129,7 +129,7 @@ Zone Types:
     # IP data source
     data_group = parser.add_argument_group("IP Data Source")
     data_group.add_argument(
-        "-i", "--ipurl", metavar="SOURCE", help="IP data source: cf, gc, ct, aws, or custom URL"
+        "-i", "--ip-url", metavar="SOURCE", help="IP data source: cf, gc, ct, aws, or custom URL"
     )
 
     # Operational flags
@@ -163,11 +163,11 @@ Zone Types:
     # Logging and debugging options
     debug_group = parser.add_argument_group("Logging and Debugging")
     debug_group.add_argument(
-        "-g", "--debug", action="store_true", help="Enable debug mode with detailed logging"
+        "-D", "--debug", action="store_true", help="Enable debug mode with detailed logging"
     )
     debug_group.add_argument("-v", "--verbose", action="store_true", help="Enable verbose output")
     debug_group.add_argument(
-        "-l",
+        "-L",
         "--log-level",
         choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
         default="INFO",
@@ -302,15 +302,15 @@ def validate_arguments(args: argparse.Namespace) -> None:
             )
 
         # Validate IP data URL if it's not a predefined source
-        if args.ipurl:
+        if args.ip_url:
             predefined_sources = ["cf", "gc", "aws", "ct"]
-            if args.ipurl.lower() not in predefined_sources:
-                if not _is_valid_url(args.ipurl):
+            if args.ip_url.lower() not in predefined_sources:
+                if not _is_valid_url(args.ip_url):
                     errors.append(
                         ValidationError(
                             "Invalid IP data URL format",
-                            field="ipurl",
-                            value=args.ipurl,
+                            field="ip_url",
+                            value=args.ip_url,
                             expected_format="cf, gc, aws, ct, or https://example.com/ips.json",
                         )
                     )
@@ -403,7 +403,7 @@ def print_configuration_summary(config: Config) -> None:
             print(f"  ✓ Email: {config.cloudflare_email}")
     else:
         print("  ⚠ Status: Not configured")
-        print("    Set CLOUDFLARE_API_TOKEN or (CLOUDFLARE_API_KEY + CLOUDFLARE_email)")
+        print("    Set CLOUDFLARE_API_TOKEN or (CLOUDFLARE_API_KEY + CLOUDFLARE_EMAIL)")
 
     # DNS settings section
     print("\n🌐 DNS Settings:")
@@ -421,7 +421,10 @@ def print_configuration_summary(config: Config) -> None:
 
     # Speed test settings section
     print("\n⚡ Speed Test Settings:")
-    print(f"  ✓ Speed Threshold: {config.speed_threshold} MB/s")
+    if config.speed_threshold > 0:
+        print(f"  ✓ Speed Threshold: {config.speed_threshold} MB/s")
+    else:
+        print("  ✓ Speed Threshold: Disabled (using latency filtering)")
 
     if config.speed_port:
         print(f"  ✓ Test Port: {config.speed_port}")
@@ -563,9 +566,15 @@ class WorkflowOrchestrator:
         """
         print("📊 Step 1: Preparing IP data source...")
 
-        # Determine IP source
+        # Determine IP source and corresponding IP file name
         ip_source = self.config.ip_data_url or "cf"  # Default to CloudFlare
-        ip_file = "ip_list.txt"
+
+        # Generate IP file name based on source
+        if ip_source in ["cf", "gc", "ct", "aws"]:
+            ip_file = f"ip_list_{ip_source}.txt"
+        else:
+            # For custom URLs, use default name
+            ip_file = "ip_list.txt"
 
         try:
             # Check if we need to refresh the IP file
@@ -593,7 +602,13 @@ class WorkflowOrchestrator:
                             f"Failed to download IP list from {ip_source}: {e}", source=ip_source
                         ) from e
             else:
-                print(f"  ✓ Using existing IP file: {ip_file}")
+                # Check if we can use cached version
+                cache_file = self.ip_source_manager._get_cache_file(ip_source)
+                if cache_file.exists() and self.ip_source_manager._is_cache_valid(cache_file):
+                    print(f"  📋 Using cached IP list from: {cache_file}")
+                    self.ip_source_manager._copy_from_cache(cache_file, ip_file)
+                else:
+                    print(f"  ✓ Using existing IP file: {ip_file}")
 
             # Verify IP file exists and has content
             if not os.path.exists(ip_file):
@@ -616,7 +631,7 @@ class WorkflowOrchestrator:
                         suggestion="Use --refresh flag to download a new IP list",
                     )
 
-                print(f"  ✓ IP file ready with {ip_count} IP addresses")
+                print(f"  ✓ IP file ready: {ip_file} with {ip_count} IP addresses")
                 return ip_file
 
             except OSError as e:
@@ -757,19 +772,24 @@ class WorkflowOrchestrator:
             valid_results = self.speedtest_manager.validate_results(results)
             print(f"  ✓ {len(valid_results)} valid results")
 
-            # Filter by speed threshold
-            filtered_results = self.results_handler.filter_by_speed(
-                valid_results, self.config.speed_threshold
-            )
-            print(
-                f"  ✓ {len(filtered_results)} results above {self.config.speed_threshold} MB/s threshold"
-            )
-
-            if not filtered_results:
-                print(
-                    f"  ⚠️ No results meet the speed threshold of {self.config.speed_threshold} MB/s"
+            # Filter by speed threshold (only if > 0)
+            if self.config.speed_threshold > 0:
+                filtered_results = self.results_handler.filter_by_speed(
+                    valid_results, self.config.speed_threshold
                 )
-                return []
+                print(
+                    f"  ✓ {len(filtered_results)} results above {self.config.speed_threshold} MB/s threshold"
+                )
+
+                if not filtered_results:
+                    print(
+                        f"  ⚠️ No results meet the speed threshold of {self.config.speed_threshold} MB/s"
+                    )
+                    return []
+            else:
+                # No speed filtering, use all valid results
+                filtered_results = valid_results
+                print("  ✓ No speed threshold applied, using all valid results")
 
             # Get top results
             if self.config.only_one:
@@ -833,11 +853,12 @@ class WorkflowOrchestrator:
 
         try:
             # Authenticate with CloudFlare
-            print("  🔐 Authenticating with CloudFlare API...")
+            print("  🔐 Validating CloudFlare credentials...")
             try:
                 self.dns_manager.authenticate()
-                print("  ✓ Authentication successful")
+                print("  ✅ CloudFlare credentials validated successfully")
             except Exception as e:
+                print(f"  ❌ CloudFlare credential validation failed: {e}")
                 if "invalid" in str(e).lower() or "unauthorized" in str(e).lower():
                     raise AuthenticationError(
                         "CloudFlare authentication failed: Invalid credentials",
