@@ -313,7 +313,7 @@ print(f"ONLY_ONE: {config.only_one}")
 
         # Check shell script defaults
         assert "ZONE_TYPE: A" in result.stdout
-        assert "SPEED_THRESHOLD: 2.0" in result.stdout
+        assert "SPEED_THRESHOLD: None" in result.stdout
         assert "QUANTITY: 0" in result.stdout
         assert "CDN_URL: https://fastfile.asfd.cn/" in result.stdout
         assert "REFRESH: False" in result.stdout

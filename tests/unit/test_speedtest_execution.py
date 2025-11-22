@@ -75,10 +75,55 @@ class TestSpeedTestExecution:
         assert "443" in call_args
         assert "-url" in call_args
         assert "https://example.com/test" in call_args
-        assert "-n" in call_args
-        assert "10" in call_args
+        # When speed_threshold > 0, -sl and -tl should be added
         assert "-sl" in call_args
         assert "5.0" in call_args
+        assert "-tl" in call_args
+        assert "200" in call_args
+
+    @patch("subprocess.run")
+    @patch("os.path.exists")
+    def test_run_speed_test_without_speed_threshold(self, mock_exists, mock_run):
+        """Test speed test execution without speed threshold (should not add -sl/-tl)."""
+        # Set speed_threshold to None
+        self.config.speed_threshold = None
+
+        # Mock file existence
+        mock_exists.side_effect = lambda path: path in ["/tmp/ip.txt", "result.csv"]
+
+        # Mock successful subprocess run
+        mock_result = Mock()
+        mock_result.returncode = 0
+        mock_run.return_value = mock_result
+
+        self.manager.run_speed_test("/tmp/ip.txt")
+
+        # Check that -sl and -tl are NOT included
+        call_args = mock_run.call_args[0][0]
+        assert "-sl" not in call_args
+        assert "-tl" not in call_args
+
+    @patch("subprocess.run")
+    @patch("os.path.exists")
+    def test_run_speed_test_with_zero_speed_threshold(self, mock_exists, mock_run):
+        """Test speed test execution with zero speed threshold (should not add -sl/-tl)."""
+        # Set speed_threshold to 0
+        self.config.speed_threshold = 0.0
+
+        # Mock file existence
+        mock_exists.side_effect = lambda path: path in ["/tmp/ip.txt", "result.csv"]
+
+        # Mock successful subprocess run
+        mock_result = Mock()
+        mock_result.returncode = 0
+        mock_run.return_value = mock_result
+
+        self.manager.run_speed_test("/tmp/ip.txt")
+
+        # Check that -sl and -tl are NOT included
+        call_args = mock_run.call_args[0][0]
+        assert "-sl" not in call_args
+        assert "-tl" not in call_args
 
     @patch("os.path.exists")
     def test_run_speed_test_ip_file_not_found(self, mock_exists):

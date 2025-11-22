@@ -51,7 +51,7 @@ class Config:
     zone_type: str = "A"
 
     # Speed test settings
-    speed_threshold: float = 0.0
+    speed_threshold: float | None = None
     speed_port: int | None = None
     speed_url: str | None = None
     timeout: int = 600  # Speed test timeout in seconds (default: 10 minutes)
@@ -120,8 +120,8 @@ class Config:
 
     def _validate_speed_settings(self) -> None:
         """Validate speed test settings."""
-        # Validate speed threshold
-        if self.speed_threshold < 0:
+        # Validate speed threshold (only if specified)
+        if self.speed_threshold is not None and self.speed_threshold < 0:
             raise ConfigurationError("Speed threshold must be greater than or equal to 0")
 
         # Validate port range
@@ -369,7 +369,7 @@ def load_config_from_args(args) -> Config:
     config.domain = args_dict.get("domain")
     config.prefix = args_dict.get("prefix")
     config.zone_type = args_dict.get("zone_type", "A")
-    config.speed_threshold = args_dict.get("speed", 2.0)
+    config.speed_threshold = args_dict.get("speed")
     config.speed_port = args_dict.get("port")
     config.speed_url = args_dict.get("url")
     config.timeout = args_dict.get("timeout", 600)
@@ -378,7 +378,7 @@ def load_config_from_args(args) -> Config:
     config.update_dns = args_dict.get("dns", False)
     config.only_one = args_dict.get("only", False)
     config.cdn_url = args_dict.get("cdn", "https://fastfile.asfd.cn/")
-    config.ip_data_url = args_dict.get("ip_url")
+    config.ip_data_url = args_dict.get("ip_url") or args_dict.get("ipurl")
     config.extend_string = args_dict.get("extend")
     config.proxy_url = args_dict.get("proxy")
     return config

@@ -347,16 +347,21 @@ class SpeedTestManager:
         #     cmd_args.extend(["-n", str(self.config.quantity)])
         #     logger.debug(f"Limiting results to: {self.config.quantity}")
 
-        # Add speed threshold if specified and > 0
-        if hasattr(self.config, "speed_threshold") and self.config.speed_threshold > 0:
+        # Add speed threshold (-sl) and latency threshold (-tl) only if speed is specified and > 0
+        if (
+            hasattr(self.config, "speed_threshold")
+            and self.config.speed_threshold is not None
+            and self.config.speed_threshold > 0
+        ):
             cmd_args.extend(["-sl", str(self.config.speed_threshold)])
             logger.debug(f"Speed threshold: {self.config.speed_threshold} MB/s")
             # Only add latency threshold when speed threshold is set
             cmd_args.extend(["-tl", "200"])
             logger.debug("Added latency threshold: 200ms")
         else:
-            # When speed threshold is 0, don't add any filtering parameters
-            logger.debug("Speed threshold is 0, no filtering parameters added")
+            logger.debug(
+                "Speed threshold not specified or <= 0, -sl and -tl parameters not added"
+            )
 
         # Add extended parameters if specified
         if hasattr(self.config, "extend_string") and self.config.extend_string:

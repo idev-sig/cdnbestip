@@ -359,7 +359,7 @@ class TestConfigurationFilePersistence:
             "cloudflare_api_key": old_data.get("api_key"),
             "cloudflare_email": old_data.get("email"),
             "domain": old_data.get("domain"),
-            "speed_threshold": 2.0,  # New default
+            "speed_threshold": None,  # New default (not specified)
             "zone_type": "A",  # New default
         }
 
@@ -372,7 +372,7 @@ class TestConfigurationFilePersistence:
 
         assert migrated_config["cloudflare_api_key"] == "old_key"
         assert migrated_config["cloudflare_email"] == "old@example.com"
-        assert migrated_config["speed_threshold"] == 2.0
+        assert migrated_config["speed_threshold"] is None
 
 
 class TestLogFileCaching:

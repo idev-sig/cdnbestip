@@ -252,7 +252,7 @@ class TestCLICompatibility:
 
             # Check shell script defaults
             assert config.zone_type == "A"
-            assert config.speed_threshold == 2.0
+            assert config.speed_threshold is None  # Not specified
             assert config.quantity == 0  # Unlimited
             assert config.refresh is False
             assert config.update_dns is False

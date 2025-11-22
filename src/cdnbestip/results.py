@@ -17,18 +17,20 @@ class ResultsHandler:
         self.config = config
 
     def filter_by_speed(
-        self, results: list[SpeedTestResult], threshold: float
+        self, results: list[SpeedTestResult], threshold: float | None
     ) -> list[SpeedTestResult]:
         """
         Filter results by speed threshold.
 
         Args:
             results: List of speed test results
-            threshold: Minimum speed threshold in MB/s
+            threshold: Minimum speed threshold in MB/s (None means no filtering)
 
         Returns:
             List of results that meet or exceed the speed threshold
         """
+        if threshold is None or threshold <= 0:
+            return results
         return [result for result in results if result.speed >= threshold]
 
     def filter_by_latency(

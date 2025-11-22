@@ -228,10 +228,11 @@ class TestBinaryExecutionIntegration:
         assert "8080" in call_args
         assert "-url" in call_args
         assert "https://test.example.com/speed" in call_args
-        assert "-n" in call_args
-        assert "5" in call_args
+        # When speed_threshold > 0, -sl and -tl should be added
         assert "-sl" in call_args
         assert "10.0" in call_args
+        assert "-tl" in call_args
+        assert "200" in call_args
 
     @patch("subprocess.run")
     def test_speed_test_timeout_handling(self, mock_subprocess):

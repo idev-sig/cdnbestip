@@ -28,7 +28,7 @@ class TestArgumentParsing:
             args = parse_arguments()
             assert args.domain == "example.com"
             assert args.prefix == "cf"
-            assert args.speed == 2.0  # default
+            assert args.speed is None  # no default
             assert args.zone_type == "A"  # default
             assert not args.dns
             assert not args.refresh
@@ -68,7 +68,7 @@ class TestArgumentParsing:
 
         with patch.object(sys, "argv", test_args):
             args = parse_arguments()
-            assert args.account == "user@example.com"
+            assert args.email == "user@example.com"
             assert args.key == "api_key_123"
             assert args.domain == "example.com"
             assert args.prefix == "cf"
@@ -77,7 +77,7 @@ class TestArgumentParsing:
             assert args.port == 443
             assert args.url == "https://test.example.com/test"
             assert args.quantity == 10
-            assert args.ipurl == "gc"
+            assert args.ip_url == "gc"
             assert args.cdn == "https://cdn.example.com/"
             assert args.extend == "extra_params"
             assert args.refresh
@@ -467,7 +467,7 @@ class TestCLIArgumentEdgeCases:
             args = parse_arguments()
             # Should accept both (validation happens later)
             assert args.token == "api_token"
-            assert args.account == "user@example.com"
+            assert args.email == "user@example.com"
             assert args.key == "api_key"
 
     def test_parse_arguments_boolean_flags_variations(self):

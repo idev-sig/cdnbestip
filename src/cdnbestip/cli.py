@@ -101,9 +101,9 @@ Zone Types:
         "-s",
         "--speed",
         type=float,
-        default=0.0,
+        default=None,
         metavar="THRESHOLD",
-        help="Download speed threshold in MB/s (default: 0.0, 0 means no speed filtering)",
+        help="Download speed threshold in MB/s (optional, only passed to cfst if specified and > 0)",
     )
     speed_group.add_argument(
         "-P", "--port", type=int, metavar="PORT", help="Speed test port (0-65535)"
@@ -201,8 +201,8 @@ def validate_arguments(args: argparse.Namespace) -> None:
     errors = []
 
     try:
-        # Validate speed threshold
-        if args.speed < 0:
+        # Validate speed threshold (only if specified)
+        if args.speed is not None and args.speed < 0:
             errors.append(
                 ValidationError(
                     "Speed threshold must be greater than or equal to 0",
@@ -224,7 +224,7 @@ def validate_arguments(args: argparse.Namespace) -> None:
             )
 
         # Validate quantity
-        if args.quantity < 0:
+        if hasattr(args, "quantity") and args.quantity is not None and args.quantity < 0:
             errors.append(
                 ValidationError(
                     "Quantity must be greater than or equal to 0",
@@ -235,7 +235,7 @@ def validate_arguments(args: argparse.Namespace) -> None:
             )
 
         # Validate timeout
-        if args.timeout <= 0:
+        if hasattr(args, "timeout") and args.timeout is not None and args.timeout <= 0:
             errors.append(
                 ValidationError(
                     "Timeout must be greater than 0",
@@ -280,7 +280,7 @@ def validate_arguments(args: argparse.Namespace) -> None:
             )
 
         # Validate proxy URL format if provided
-        if args.proxy and not _is_valid_proxy_url(args.proxy):
+        if hasattr(args, "proxy") and args.proxy and not _is_valid_proxy_url(args.proxy):
             errors.append(
                 ValidationError(
                     "Invalid proxy URL format",
@@ -291,7 +291,7 @@ def validate_arguments(args: argparse.Namespace) -> None:
             )
 
         # Validate domain format if provided
-        if args.domain and not _is_valid_domain(args.domain):
+        if hasattr(args, "domain") and args.domain and not _is_valid_domain(args.domain):
             errors.append(
                 ValidationError(
                     "Invalid domain format",
@@ -302,7 +302,7 @@ def validate_arguments(args: argparse.Namespace) -> None:
             )
 
         # Validate IP data URL if it's not a predefined source
-        if args.ip_url:
+        if hasattr(args, "ip_url") and args.ip_url:
             predefined_sources = ["cf", "gc", "aws", "ct"]
             if args.ip_url.lower() not in predefined_sources:
                 if not _is_valid_url(args.ip_url):
@@ -316,8 +316,8 @@ def validate_arguments(args: argparse.Namespace) -> None:
                     )
 
         # Check for DNS operation requirements
-        if args.dns:
-            if not args.domain:
+        if hasattr(args, "dns") and args.dns:
+            if not hasattr(args, "domain") or not args.domain:
                 errors.append(
                     ConfigurationError(
                         "Domain is required for DNS operations",
@@ -325,7 +325,7 @@ def validate_arguments(args: argparse.Namespace) -> None:
                         suggestion="Use -d/--domain option to specify your domain (e.g., -d example.com)",
                     )
                 )
-            if not args.prefix:
+            if not hasattr(args, "prefix") or not args.prefix:
                 errors.append(
                     ConfigurationError(
                         "Prefix is required for DNS operations",
@@ -335,7 +335,7 @@ def validate_arguments(args: argparse.Namespace) -> None:
                 )
 
         # Validate conflicting options
-        if args.only and not args.dns:
+        if hasattr(args, "only") and hasattr(args, "dns") and args.only and not args.dns:
             errors.append(
                 ConfigurationError(
                     "--only flag requires --dns flag to be set",
@@ -421,10 +421,10 @@ def print_configuration_summary(config: Config) -> None:
 
     # Speed test settings section
     print("\n⚡ Speed Test Settings:")
-    if config.speed_threshold > 0:
+    if config.speed_threshold is not None and config.speed_threshold > 0:
         print(f"  ✓ Speed Threshold: {config.speed_threshold} MB/s")
     else:
-        print("  ✓ Speed Threshold: Disabled (using latency filtering)")
+        print("  ✓ Speed Threshold: Not specified (no filtering)")
 
     if config.speed_port:
         print(f"  ✓ Test Port: {config.speed_port}")
@@ -772,8 +772,11 @@ class WorkflowOrchestrator:
             valid_results = self.speedtest_manager.validate_results(results)
             print(f"  ✓ {len(valid_results)} valid results")
 
-            # Filter by speed threshold (only if > 0)
-            if self.config.speed_threshold > 0:
+            # Filter by speed threshold (only if specified and > 0)
+            if (
+                self.config.speed_threshold is not None
+                and self.config.speed_threshold > 0
+            ):
                 filtered_results = self.results_handler.filter_by_speed(
                     valid_results, self.config.speed_threshold
                 )
